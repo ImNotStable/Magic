@@ -1,0 +1,10 @@
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+        maven { url "https://repo.papermc.io/repository/maven-public/" }
+        maven { url 'https://oss.sonatype.org/content/groups/public/' }
+    }
+}
+
+rootProject.name = 'AutismMagic'

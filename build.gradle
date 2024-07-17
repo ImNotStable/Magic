@@ -1,0 +1,83 @@
+import org.apache.tools.ant.filters.ReplaceTokens
+
+plugins {
+    id 'java'
+    id 'io.papermc.paperweight.userdev' version '1.7.1'
+    id 'io.github.goooler.shadow' version '8.1.8'
+}
+
+group 'org.freedomcraft.freedomjournal'
+
+int buildNumber
+
+compileJava {
+    sourceCompatibility = '21'
+    targetCompatibility = '21'
+    options.encoding = 'UTF-8'
+    jar.enabled = false
+}
+
+dependencies {
+    paperweight.paperDevBundle "${minecraftVersion}-R0.1-SNAPSHOT"
+
+    compileOnly 'org.projectlombok:lombok:1.18.34'
+    annotationProcessor 'org.projectlombok:lombok:1.18.34'
+    compileOnly 'org.jetbrains:annotations:24.1.0'
+    annotationProcessor 'org.jetbrains:annotations:24.1.0'
+
+    implementation 'org.reflections:reflections:0.10.2'
+
+    implementation 'dev.jorel:commandapi-bukkit-shade:9.5.1'
+}
+
+shadowJar {
+    relocate 'dev.jorel.commandapi', group + '.commandapi'
+    minimize()
+}
+
+assemble {
+    dependsOn reobfJar
+}
+
+build {
+    doLast {
+        Arrays.stream(new File("build/libs").listFiles())
+                .filter(file -> file.getName().matches("${project.name}-[0-9]+\\.[0-9]+\\.?[0-9]+?-b[0-9]+\\.jar"))
+                .forEach(File::delete)
+        project.copy {
+            from(project.tasks.reobfJar.outputJar)
+            into("build/libs")
+            rename(_ -> "${project.name}-${minecraftVersion}-b${buildNumber}.jar")
+        }
+    }
+}
+
+tasks.register("incrementBuildNumber") {
+    doLast {
+        def buildNumberFile = project.file('version.properties')
+        def buildProperties = new Properties()
+        buildProperties.load(buildNumberFile.newDataInputStream())
+        buildNumber = buildProperties.getProperty('buildNumber').toInteger() + 1
+        buildProperties.setProperty('buildNumber', buildNumber.toString())
+        buildProperties.store(buildNumberFile.newWriter(), null)
+    }
+}
+
+tasks.register("exportRelease") {
+    doLast {
+        Arrays.stream(new File("${serverPath}plugins/").listFiles())
+                .filter(file -> file.getName().startsWith("${project.name}") && file.getName().endsWith(".jar"))
+                .forEach(File::delete)
+        project.copy {
+            from(project.tasks.reobfJar.outputJar)
+            into("${serverPath}plugins/")
+            rename(_ -> "${project.name}-${minecraftVersion}-b${buildNumber}.jar")
+        }
+    }
+}
+
+processResources {
+    dependsOn incrementBuildNumber
+    def version = "${minecraftVersion}-b${buildNumber}".toString()
+    filter(ReplaceTokens, tokens: [version: version])
+}
